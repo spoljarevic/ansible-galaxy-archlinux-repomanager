@@ -1,0 +1,21 @@
+#SPDX-License-Identifier: MIT-0
+galaxy_info:
+  author: Luca Matteo Spoljarevic
+  description: Enable optional Arch Linux community repositories (CachyOS, BlackArch) on top of vanilla pacman
+  company: false
+
+  license: MIT-0
+
+  min_ansible_version: 2.9
+
+  platforms:
+    - name: Archlinux
+
+  galaxy_tags:
+    - archlinux
+    - pacman
+    - cachyos
+    - blackarch
+    - repository
+
+dependencies: []

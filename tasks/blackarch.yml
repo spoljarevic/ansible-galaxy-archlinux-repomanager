@@ -1,0 +1,25 @@
+#SPDX-License-Identifier: MIT-0
+---
+- name: Ensure curl and gnupg are present (needed for strap.sh)
+  ansible.builtin.pacman:
+    name:
+      - curl
+      - gnupg
+    state: present
+    update_cache: yes
+
+- name: Download BlackArch strap script
+  ansible.builtin.get_url:
+    url: "{{ archrepomanager_blackarch_strap_url }}"
+    dest: /tmp/blackarch-strap.sh
+    mode: '0755'
+
+- name: Run BlackArch strap script
+  ansible.builtin.command:
+    cmd: /tmp/blackarch-strap.sh
+  args:
+    creates: /etc/pacman.d/blackarch-mirrorlist
+
+- name: Update pacman database after BlackArch setup
+  ansible.builtin.pacman:
+    update_cache: yes

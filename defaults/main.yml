@@ -1,0 +1,31 @@
+#SPDX-License-Identifier: MIT-0
+---
+# defaults file for archlinux-repomanager
+
+# Enable/disable each repository independently. Both can be installed
+# on top of vanilla pacman at the same time.
+archrepomanager_cachyos_enabled: false
+archrepomanager_blackarch_enabled: false
+
+# --- CachyOS ---------------------------------------------------------------
+# CPU-optimized repo variant to enable alongside the base [cachyos] repo,
+# e.g. "v3", "v4", "znver3", "znver4". Set to "" to install only the base repo.
+archrepomanager_cachyos_variant: "v4"
+
+# CachyOS only publishes cachyos-v3-mirrorlist and cachyos-v4-mirrorlist
+# packages. The znverN repo variants (per-microarch tuning, e.g. Zen 4/5 ->
+# znver4) reuse one of those two mirrorlist files rather than shipping their
+# own - see https://wiki.cachyos.org/features/optimized_repos/. This map
+# translates a variant to the mirrorlist package/file that actually backs
+# it. Variants not listed here (e.g. "v3", "v4") fall back to using their
+# own name as the mirrorlist tier.
+archrepomanager_cachyos_mirrorlist_map:
+  znver3: v3
+  znver4: v4
+
+archrepomanager_cachyos_keyserver: "keyserver.ubuntu.com"
+archrepomanager_cachyos_key: "F3B607488DB35A47"
+archrepomanager_cachyos_mirror: "https://mirror.cachyos.org/repo/x86_64/cachyos"
+
+# --- BlackArch --------------------------------------------------------------
+archrepomanager_blackarch_strap_url: "https://blackarch.org/strap.sh"

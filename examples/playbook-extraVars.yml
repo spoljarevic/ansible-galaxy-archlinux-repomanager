@@ -1,0 +1,19 @@
+#SPDX-License-Identifier: MIT-0
+---
+- name: Enable extra Arch Linux repositories
+  hosts: archlinux_hosts
+  become: true
+  roles:
+    - role: spoljarevic.archlinux-repomanager
+      vars:
+        archrepomanager_cachyos_enabled: true
+        archrepomanager_cachyos_variant: v4
+        archrepomanager_cachyos_mirrorlist_map:
+          znver3: v3
+          znver4: v4
+        archrepomanager_cachyos_keyserver: keyserver.ubuntu.com
+        archrepomanager_cachyos_key: F3B607488DB35A47
+        archrepomanager_cachyos_mirror: https://mirror.cachyos.org/repo/x86_64/cachyos
+
+        archrepomanager_blackarch_enabled: true
+        archrepomanager_blackarch_strap_url: https://blackarch.org/strap.sh
