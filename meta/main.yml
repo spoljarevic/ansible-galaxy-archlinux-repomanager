@@ -2,7 +2,7 @@
 galaxy_info:
   author: Luca Matteo Spoljarevic
   description: Enable optional Arch Linux community repositories (CachyOS, BlackArch) on top of vanilla pacman
-  company: false
+  company: ""
 
   license: MIT-0
 
