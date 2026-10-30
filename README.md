@@ -18,11 +18,16 @@ Requirements
 - Arch Linux (or an Arch-based distro using pacman).
 - Internet access to fetch keys/mirrorlists from the CachyOS mirror and
   the BlackArch strap script.
+- The `community.general` collection (for the `pacman` module). Install with:
+
+  ```bash
+  ansible-galaxy collection install -r requirements.yml
+  ```
 
 The CachyOS mirror (`archrepomanager_cachyos_mirror`) is the live, rolling
 repo directory — not a dated/versioned snapshot. The role always scrapes
 that directory listing to grab whatever keyring/mirrorlist package is
-currently newest (`grep` + `tail -1`), so no package version or date ever
+currently newest, so no package version or date ever
 needs to be pinned in the URL.
 
 Role Variables

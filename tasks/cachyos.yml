@@ -1,4 +1,4 @@
-#SPDX-License-Identifier: MIT-0
+# SPDX-License-Identifier: MIT-0
 ---
 - name: Determine mirrorlist tier backing the selected CachyOS variant
   ansible.builtin.set_fact:
@@ -6,49 +6,53 @@
       {{ archrepomanager_cachyos_mirrorlist_map[archrepomanager_cachyos_variant] | default(archrepomanager_cachyos_variant) }}
 
 - name: Install gnupg (provides dirmngr for keyserver access)
-  ansible.builtin.pacman:
+  community.general.pacman:
     name: gnupg
     state: present
 
-- name: Fetch and import CachyOS signing key
-  ansible.builtin.shell:
-    cmd: curl -s "https://{{ archrepomanager_cachyos_keyserver }}/pks/lookup?op=get&search=0x{{ archrepomanager_cachyos_key }}" | pacman-key --add -
+- name: Check whether the CachyOS signing key is already in the pacman keyring
+  ansible.builtin.command:
+    cmd: pacman-key --list-keys {{ archrepomanager_cachyos_key }}
+  register: archrepomanager_cachyos_key_check
   changed_when: false
+  failed_when: false
+
+- name: Download CachyOS signing key
+  ansible.builtin.get_url:
+    url: "https://{{ archrepomanager_cachyos_keyserver }}/pks/lookup?op=get&search=0x{{ archrepomanager_cachyos_key }}"
+    dest: /tmp/cachyos.asc
+    mode: "0644"
+  when: archrepomanager_cachyos_key_check.rc != 0
+
+- name: Import CachyOS signing key
+  ansible.builtin.command:
+    cmd: pacman-key --add /tmp/cachyos.asc
+  changed_when: true
+  when: archrepomanager_cachyos_key_check.rc != 0
 
 - name: Locally sign CachyOS key
   ansible.builtin.command:
     cmd: pacman-key --lsign-key {{ archrepomanager_cachyos_key }}
   changed_when: false
 
-- name: Get latest cachyos-keyring package filename
-  ansible.builtin.shell:
-    cmd: >
-      curl -s {{ archrepomanager_cachyos_mirror }}/
-      | grep -oP 'cachyos-keyring-[^"]+\.pkg\.tar\.zst'
-      | grep -v '\.sig'
-      | tail -1
-  register: archrepomanager_cachyos_keyring_pkg
-  changed_when: false
+- name: Fetch the CachyOS repository index
+  ansible.builtin.uri:
+    url: "{{ archrepomanager_cachyos_mirror }}/"
+    return_content: true
+  register: archrepomanager_cachyos_index
 
-- name: Get latest cachyos-mirrorlist package filename
-  ansible.builtin.shell:
-    cmd: >
-      curl -s {{ archrepomanager_cachyos_mirror }}/
-      | grep -oP 'cachyos-mirrorlist-[^"]+\.pkg\.tar\.zst'
-      | grep -v '\.sig'
-      | tail -1
-  register: archrepomanager_cachyos_mirrorlist_pkg
-  changed_when: false
+- name: Get latest CachyOS keyring and mirrorlist package filenames
+  ansible.builtin.set_fact:
+    archrepomanager_cachyos_keyring_pkg: >-
+      {{ archrepomanager_cachyos_index.content | regex_findall('cachyos-keyring-[0-9][^"<>\s]*\.pkg\.tar\.zst') | last }}
+    archrepomanager_cachyos_mirrorlist_pkg: >-
+      {{ archrepomanager_cachyos_index.content | regex_findall('cachyos-mirrorlist-[0-9][^"<>\s]*\.pkg\.tar\.zst') | last }}
 
-- name: Get latest cachyos-{{ archrepomanager_cachyos_mirrorlist_tier }}-mirrorlist package filename
-  ansible.builtin.shell:
-    cmd: >
-      curl -s {{ archrepomanager_cachyos_mirror }}/
-      | grep -oP 'cachyos-{{ archrepomanager_cachyos_mirrorlist_tier }}-mirrorlist-[^"]+\.pkg\.tar\.zst'
-      | grep -v '\.sig'
-      | tail -1
-  register: archrepomanager_cachyos_variant_mirrorlist_pkg
-  changed_when: false
+- name: Get latest mirrorlist package filename for tier {{ archrepomanager_cachyos_mirrorlist_tier }}
+  ansible.builtin.set_fact:
+    archrepomanager_cachyos_variant_mirrorlist_pkg: >-
+      {{ archrepomanager_cachyos_index.content
+      | regex_findall('cachyos-' ~ archrepomanager_cachyos_mirrorlist_tier ~ '-mirrorlist-[0-9][^"<>\s]*\.pkg\.tar\.zst') | last }}
   when: archrepomanager_cachyos_variant | length > 0
 
 - name: Remove stale pacman lock if present
@@ -58,19 +62,19 @@
 
 - name: Install cachyos-keyring
   ansible.builtin.command:
-    cmd: pacman -U --noconfirm {{ archrepomanager_cachyos_mirror }}/{{ archrepomanager_cachyos_keyring_pkg.stdout }}
+    cmd: pacman -U --noconfirm {{ archrepomanager_cachyos_mirror }}/{{ archrepomanager_cachyos_keyring_pkg }}
   args:
     creates: /usr/share/pacman/keyrings/cachyos.gpg
 
 - name: Install cachyos-mirrorlist
   ansible.builtin.command:
-    cmd: pacman -U --noconfirm {{ archrepomanager_cachyos_mirror }}/{{ archrepomanager_cachyos_mirrorlist_pkg.stdout }}
+    cmd: pacman -U --noconfirm {{ archrepomanager_cachyos_mirror }}/{{ archrepomanager_cachyos_mirrorlist_pkg }}
   args:
     creates: /etc/pacman.d/cachyos-mirrorlist
 
-- name: Install cachyos-{{ archrepomanager_cachyos_mirrorlist_tier }}-mirrorlist
+- name: Install mirrorlist package for tier {{ archrepomanager_cachyos_mirrorlist_tier }}
   ansible.builtin.command:
-    cmd: pacman -U --noconfirm {{ archrepomanager_cachyos_mirror }}/{{ archrepomanager_cachyos_variant_mirrorlist_pkg.stdout }}
+    cmd: pacman -U --noconfirm {{ archrepomanager_cachyos_mirror }}/{{ archrepomanager_cachyos_variant_mirrorlist_pkg }}
   args:
     creates: /etc/pacman.d/cachyos-{{ archrepomanager_cachyos_mirrorlist_tier }}-mirrorlist
   when: archrepomanager_cachyos_variant | length > 0
@@ -93,5 +97,5 @@
     state: present
 
 - name: Refresh pacman databases
-  ansible.builtin.pacman:
-    update_cache: yes
+  community.general.pacman:
+    update_cache: true

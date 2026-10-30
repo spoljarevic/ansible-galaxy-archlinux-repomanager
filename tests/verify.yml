@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: MIT-0
+---
+- name: Verify the enabled repositories
+  hosts: all
+  become: true
+  gather_facts: false
+  vars:
+    archrepomanager_cachyos_enabled: false
+    archrepomanager_cachyos_variant: "v4"
+    archrepomanager_blackarch_enabled: false
+    verify_cachyos_repos: >-
+      {{ (['cachyos-' ~ archrepomanager_cachyos_variant,
+           'cachyos-core-' ~ archrepomanager_cachyos_variant,
+           'cachyos-extra-' ~ archrepomanager_cachyos_variant]
+          if archrepomanager_cachyos_variant | length > 0 else []) + ['cachyos'] }}
+    verify_expected_repos: >-
+      {{ (verify_cachyos_repos if archrepomanager_cachyos_enabled | bool else [])
+         + (['blackarch'] if archrepomanager_blackarch_enabled | bool else []) }}
+  tasks:
+    - name: Read the repositories pacman knows about
+      ansible.builtin.command: pacman-conf --repo-list
+      register: verify_repo_list
+      changed_when: false
+
+    - name: Exactly the expected extra repositories are configured
+      ansible.builtin.assert:
+        that:
+          - verify_repo_list.stdout_lines | select('match', '^(cachyos|blackarch)') | sort | list == verify_expected_repos | sort
+        fail_msg: "expected {{ verify_expected_repos }}, pacman has {{ verify_repo_list.stdout_lines }}"
+
+    - name: Every new repository syncs and lists packages
+      ansible.builtin.command: pacman -Sl {{ item }}
+      register: verify_repo_packages
+      changed_when: false
+      failed_when: verify_repo_packages.rc != 0 or verify_repo_packages.stdout_lines | length == 0
+      loop: "{{ verify_expected_repos }}"
+
+    - name: Read installed CachyOS keyring and mirrorlist packages
+      ansible.builtin.command: pacman -Qq cachyos-keyring cachyos-mirrorlist
+      register: verify_cachyos_pkgs
+      changed_when: false
+      when: archrepomanager_cachyos_enabled | bool

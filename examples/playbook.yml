@@ -1,4 +1,4 @@
-#SPDX-License-Identifier: MIT-0
+# SPDX-License-Identifier: MIT-0
 ---
 - name: Enable extra Arch Linux repositories
   hosts: archlinux_hosts
@@ -7,9 +7,6 @@
     - role: spoljarevic.archlinux-repomanager
       vars:
         archrepomanager_cachyos_enabled: true
-        archrepomanager_cachyos_variant: ""
-        archrepomanager_cachyos_variant: v3
+        # One of: "" (base repo only), v3, v4, znver3, znver4
         archrepomanager_cachyos_variant: v4
-        archrepomanager_cachyos_variant: znver3
-        archrepomanager_cachyos_variant: znver4
         archrepomanager_blackarch_enabled: true

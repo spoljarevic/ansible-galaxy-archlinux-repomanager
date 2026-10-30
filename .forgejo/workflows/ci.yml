@@ -1,0 +1,99 @@
+---
+name: Role CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  ANSIBLE_FORCE_COLOR: "1"
+  PY_COLORS: "1"
+  ROLE_NAME: spoljarevic.archlinux-repomanager
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  lint:
+    name: Lint (yamllint + ansible-lint)
+    runs-on: codeberg-small
+    container:
+      image: node:20-bookworm
+    steps:
+      - uses: https://code.forgejo.org/actions/checkout@v4
+
+      - name: Install linters and collections
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq python3-venv >/dev/null
+          python3 -m venv /opt/ansible
+          /opt/ansible/bin/pip install -q ansible-lint yamllint
+          /opt/ansible/bin/ansible-galaxy collection install -r requirements.yml
+          echo "/opt/ansible/bin" >> "$GITHUB_PATH"
+
+      - name: Make the role available under its Galaxy name
+        run: |
+          mkdir -p ~/.ansible/roles
+          ln -s "$PWD" ~/.ansible/roles/"$ROLE_NAME"
+
+      - name: yamllint
+        run: yamllint --strict .
+
+      - name: ansible-lint
+        if: success() || failure()
+        run: ansible-lint
+
+  # Apply the role on a fresh Arch Linux container for every supported
+  # setup, check that pacman can sync the new repositories, then run the
+  # role again and require zero changes.
+  archlinux:
+    name: Arch Linux (${{ matrix.scenario }})
+    needs: lint
+    runs-on: codeberg-small
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - scenario: cachyos-v4 + blackarch
+            vars: '{"archrepomanager_cachyos_enabled": true, "archrepomanager_cachyos_variant": "v4", "archrepomanager_blackarch_enabled": true}'
+          - scenario: cachyos base only
+            vars: '{"archrepomanager_cachyos_enabled": true, "archrepomanager_cachyos_variant": ""}'
+          - scenario: cachyos-znver4
+            vars: '{"archrepomanager_cachyos_enabled": true, "archrepomanager_cachyos_variant": "znver4"}'
+          - scenario: cachyos-v3
+            vars: '{"archrepomanager_cachyos_enabled": true, "archrepomanager_cachyos_variant": "v3"}'
+          - scenario: nothing enabled
+            vars: '{}'
+    container:
+      image: docker.io/library/archlinux:latest
+    env:
+      SCENARIO_VARS: ${{ matrix.vars }}
+    steps:
+      - name: Prepare a fresh Arch install
+        run: |
+          pacman-key --init
+          pacman-key --populate archlinux
+          pacman -Syu --noconfirm --needed nodejs git ansible
+
+      - uses: https://code.forgejo.org/actions/checkout@v4
+
+      - name: Make the role available under its Galaxy name
+        run: |
+          mkdir -p ~/.ansible/roles
+          ln -s "$PWD" ~/.ansible/roles/"$ROLE_NAME"
+          printf 'localhost ansible_connection=local ansible_python_interpreter=/usr/bin/python3\n' > /tmp/inventory
+
+      - name: Apply the role
+        run: ansible-playbook -i /tmp/inventory tests/test.yml -e "$SCENARIO_VARS"
+
+      - name: Verify the repositories
+        run: ansible-playbook -i /tmp/inventory tests/verify.yml -e "$SCENARIO_VARS"
+
+      - name: Re-run the role (must be idempotent)
+        run: |
+          ansible-playbook -i /tmp/inventory tests/test.yml -e "$SCENARIO_VARS" | tee /tmp/second-run.log
+          sed -i 's/\x1b\[[0-9;]*m//g' /tmp/second-run.log
+          grep -qE 'localhost +: ok=[0-9]+ +changed=0 +unreachable=0 +failed=0' /tmp/second-run.log
