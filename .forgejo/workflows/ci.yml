@@ -74,6 +74,11 @@ jobs:
     steps:
       - name: Prepare a fresh Arch install
         run: |
+          # Fall back to other mirrors if the default CDN is unreachable
+          printf 'Server = %s\n' \
+            'https://geo.mirror.pkgbuild.com/$repo/os/$arch' \
+            'https://mirror.rackspace.com/archlinux/$repo/os/$arch' \
+            'https://mirror.leaseweb.net/archlinux/$repo/os/$arch' > /etc/pacman.d/mirrorlist
           pacman-key --init
           pacman-key --populate archlinux
           pacman -Syu --noconfirm --needed nodejs git ansible
